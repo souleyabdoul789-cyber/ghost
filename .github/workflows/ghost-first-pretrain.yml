@@ -1,0 +1,142 @@
+name: ghost — first French pretraining
+
+on:
+  push:
+    branches:
+      - pretraining/0.6.2
+  workflow_dispatch:
+    inputs:
+      dataset_revision:
+        description: Hugging Face branch, tag, or immutable commit SHA
+        required: true
+        default: "main"
+        type: string
+      max_documents:
+        description: Maximum streamed documents for this bounded pilot
+        required: true
+        default: "10000"
+        type: string
+      max_total_chars:
+        description: Maximum characters written to the pilot corpus
+        required: true
+        default: "20000000"
+        type: string
+      epochs:
+        description: Number of random-window training rounds, not full corpus passes
+        required: true
+        default: "3"
+        type: string
+      steps_per_epoch:
+        description: Number of random context windows per round
+        required: true
+        default: "500"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+  DATASET_REVISION: ${{ github.event.inputs.dataset_revision || 'main' }}
+  MAX_DOCUMENTS: ${{ github.event.inputs.max_documents || '10000' }}
+  MAX_TOTAL_CHARS: ${{ github.event.inputs.max_total_chars || '20000000' }}
+  TRAINING_ROUNDS: ${{ github.event.inputs.epochs || '3' }}
+  STEPS_PER_ROUND: ${{ github.event.inputs.steps_per_epoch || '500' }}
+
+concurrency:
+  group: ghost-first-pretrain
+  cancel-in-progress: false
+
+jobs:
+  pretrain:
+    # GitHub-hosted jobs have a hard six-hour execution limit.
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Restore dataset and checkpoint cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/fineweb2_fr_pilot.jsonl
+            data/fineweb2_fr_pilot.jsonl.source.json
+            runs/ghost-fr-pilot-001
+          key: ghost-fr-${{ runner.os }}-${{ env.DATASET_REVISION }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ghost-fr-${{ runner.os }}-${{ env.DATASET_REVISION }}-
+
+      - name: Install ghost and data dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install '.[data]'
+
+      - name: Stream a bounded, revision-pinned French corpus
+        run: |
+          python examples/fetch_hf_stream.py \
+            --dataset Brainquiver/general-web-fr-202608 \
+            --config fineweb2-hq-fra_Latn \
+            --revision '${{ env.DATASET_REVISION }}' \
+            --output data/fineweb2_fr_pilot.jsonl \
+            --max-documents '${{ env.MAX_DOCUMENTS }}' \
+            --max-total-chars '${{ env.MAX_TOTAL_CHARS }}' \
+            --min-language-score 0.95 \
+            --min-quality-score 0.30 \
+            --resume
+
+      - name: Pretrain ghost GPT pilot (resumable within a round)
+        run: |
+          python examples/train_ghost.py data/fineweb2_fr_pilot.jsonl \
+            --output runs/ghost-fr-pilot-001 \
+            --vocab-size 1024 --min-frequency 2 \
+            --d-model 64 --heads 4 --layers 2 --context 128 \
+            --epochs '${{ env.TRAINING_ROUNDS }}' \
+            --steps-per-epoch '${{ env.STEPS_PER_ROUND }}' \
+            --checkpoint-every-steps 50 \
+            --learning-rate 3e-4 --weight-decay 0.01 \
+            --tokens-per-shard 250000 --seed 42 --resume
+
+      - name: Write human-readable training report
+        if: always()
+        run: |
+          if [ -d runs/ghost-fr-pilot-001 ]; then
+            python examples/write_training_report.py \
+              --run-dir runs/ghost-fr-pilot-001 \
+              --source-manifest data/fineweb2_fr_pilot.jsonl.source.json \
+              --output runs/ghost-fr-pilot-001/report.txt
+          fi
+
+      - name: Save resumable state (including partial runs)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/fineweb2_fr_pilot.jsonl
+            data/fineweb2_fr_pilot.jsonl.source.json
+            runs/ghost-fr-pilot-001
+          key: ghost-fr-${{ runner.os }}-${{ env.DATASET_REVISION }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload model and training evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghost-fr-pilot-001-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 90
+          path: |
+            runs/ghost-fr-pilot-001/model.json
+            runs/ghost-fr-pilot-001/tokenizer.json
+            runs/ghost-fr-pilot-001/checkpoint.json
+            runs/ghost-fr-pilot-001/metrics.jsonl
+            runs/ghost-fr-pilot-001/run_config.json
+            runs/ghost-fr-pilot-001/generation_sample.txt
+            runs/ghost-fr-pilot-001/report.txt
+            runs/ghost-fr-pilot-001/dataset/manifest.jsonl
+            data/fineweb2_fr_pilot.jsonl.source.json

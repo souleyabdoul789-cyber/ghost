@@ -1,0 +1,17 @@
+include README.md
+include build_native.py
+recursive-include c *.c *.h
+recursive-include python/ghost *.py
+recursive-include tests *.py *.c *.sh
+recursive-include docs *.md
+recursive-include bench *.py *.md
+recursive-include examples *.py
+
+# Do not ship a native library compiled for the build host in the source archive.
+exclude python/ghost/libghost.so
+exclude python/ghost/libghost.dylib
+exclude python/ghost/ghost.dll
+recursive-include examples/data *.jsonl
+recursive-include configs *.json
+include docs/FIRST-TRAINING-REPORT.txt
+include .github/workflows/ghost-first-pretrain.yml

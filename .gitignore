@@ -1,0 +1,33 @@
+# Native build products
+python/ghost/libghost.so
+python/ghost/libghost.dylib
+python/ghost/ghost.dll
+*.o
+*.a
+*.so.tmp
+*.dylib.tmp
+*.dll.tmp
+
+# Python packaging and caches
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Runtime artifacts
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.ghost-model.json
+*.ghost-tokenizer.json
+examples/*_model.json
+examples/*_model.json.tmp
+
+# Compiled native test executables
+tests/test_core
+tests/test_core_asan
+
+# Training runs and generated corpora
+runs/

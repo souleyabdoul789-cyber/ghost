@@ -1,0 +1,57 @@
+{
+  "run_name": "ghost-fr-pilot-001",
+  "stage": "causal_language_model_pretraining",
+  "dataset": {
+    "id": "Brainquiver/general-web-fr-202608",
+    "config": "fineweb2-hq-fra_Latn",
+    "revision": "main",
+    "split": "train",
+    "license": "ODC-By-1.0",
+    "streaming": true,
+    "max_documents": 10000,
+    "max_total_characters": 20000000,
+    "min_language_score": 0.95,
+    "min_quality_score": 0.30,
+    "min_document_characters": 300,
+    "max_document_characters": 12000,
+    "seed": 42
+  },
+  "tokenizer": {
+    "type": "byte_level_bpe",
+    "vocab_size": 1024,
+    "min_frequency": 2,
+    "special_tokens": ["<|eos|>"]
+  },
+  "model": {
+    "architecture": "causal_decoder_transformer",
+    "d_model": 64,
+    "heads": 4,
+    "layers": 2,
+    "context": 128,
+    "ff_mult": 4,
+    "dtype": "float32"
+  },
+  "training": {
+    "epochs": 3,
+    "steps_per_epoch": 500,
+    "learning_rate": 0.0003,
+    "weight_decay": 0.01,
+    "tokens_per_shard": 250000,
+    "gradient_clip_norm": 1.0,
+    "seed": 42,
+    "resume": true
+  },
+  "evaluation": {
+    "validation_steps": 32,
+    "test_split_reserved": true,
+    "track_train_loss": true,
+    "track_validation_loss": true,
+    "track_tokens_per_second": true
+  },
+  "notes": [
+    "Pilot de pipeline et de qualité des données, pas un modèle final.",
+    "Une époque dans le script actuel correspond à steps_per_epoch fenêtres aléatoires, pas à un passage exhaustif du corpus.",
+    "Ne pas augmenter les dimensions avant d'avoir mesuré vitesse, RAM et baisse de validation loss.",
+    "Le split test reste réservé et ne sert jamais à ajuster les hyperparamètres."
+  ]
+}

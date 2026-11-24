@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=70.1", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ghost-gsociety"
+version = "0.6.2"
+description = "ghost — moteur IA natif C, LLM expérimental, données, vision et agent outillé"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "G-SOCIETY DEV"}]
+
+[project.optional-dependencies]
+data = ["datasets>=3.0"]
+browser = ["playwright>=1.40"]
+vision = ["Pillow>=10", "numpy>=1.24", "onnxruntime>=1.17"]
+
+[project.urls]
+Homepage = "https://github.com/souleyabdoul789-cyber/ghost"
+Repository = "https://github.com/souleyabdoul789-cyber/ghost"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.setuptools.package-data]
+ghost = ["*.so", "*.dylib", "*.dll"]

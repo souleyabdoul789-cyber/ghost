@@ -1,0 +1,57 @@
+ghost 0.6.2 — RAPPORT DE VALIDATION TECHNIQUE
+=============================================
+Date: 2026-11-24
+Environnement: Linux x86-64, Python 3.13.5, GCC/Clang C build
+
+COMPILATION
+-----------
+bash build.sh: OK
+Bibliothèque native produite pour Linux x86-64.
+
+TESTS AUTOMATISÉS
+-----------------
+34 tests Python: OK
+Couvre notamment le moteur natif via l'API Python, le Transformer,
+le tokenizer, les splits/dédoublonnages, les outils d'agent,
+le sandbox en mode refus sûr, l'extraction HF simulée, la validation
+SHA de révision, les checkpoints, la génération et la reprise.
+Les tests de téléchargement HF utilisent des doubles de test : ils ne
+constituent pas un téléchargement réel du corpus.
+
+SMOKE TEST LOCAL (CORPUS JOUET)
+-------------------------------
+Source: examples/data/tiny_text_demo.jsonl (30 documents synthétiques)
+Modèle: Transformer causal 1 couche, d_model=16, 2 têtes, contexte=48
+Tokenizer: byte-level BPE, vocabulaire final=301
+Étapes: 4 mises à jour
+Tokens d'entraînement vus: 192
+Train loss: 5.725073
+Validation loss initiale: 5.726064
+Validation loss finale: 5.715489
+Débit observé: environ 1 672 tokens/s sur l'environnement de test
+Checkpoint v2: écrit et relu lors d'une reprise sans progression supplémentaire
+Rapport TXT: généré avec empreintes SHA-256
+
+GÉNÉRATION
+----------
+Le texte généré sur ce corpus jouet demeure incohérent. C'est attendu pour
+un test de quelques centaines de tokens ; ce résultat ne prouve aucune
+capacité conversationnelle, générale ou agentique.
+
+ÉTAT DU PRÉ-ENTRAÎNEMENT RÉEL
+-----------------------------
+Aucun téléchargement réel de FineWeb2-HQ ni aucun run GitHub Actions n'a
+été lancé depuis cet environnement. Le nouveau dépôt dédié `ghost` doit être
+créé vide sous le compte GitHub du propriétaire avant publication.
+Le script `scripts/publish_training_branch.sh` pousse une branche isolée
+`pretraining/0.6.2` vers un remote dont le nom doit être `ghost` ; il refuse
+tout remote pointant vers l'ancien dépôt `G` et ne force jamais la branche.
+
+LIMITES
+-------
+Ce pilote emploie un petit Transformer float32 sur CPU, sans backend GPU.
+Le pré-entraînement causal apprend à prédire le prochain token ; il ne
+confère pas automatiquement la capacité d'utiliser un navigateur ou un
+terminal. Une phase SFT sur des traces d'outils et des évaluations en
+sandbox restent nécessaires. L'exécution de code doit rester limitée à
+des outils autorisés, avec quotas, délais et isolation.

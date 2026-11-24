@@ -1,0 +1,42 @@
+GHOST — FIRST TRAINING ENGINEERING REPORT
+========================================
+Build: 0.6.1
+Date: 2026-11-24
+
+REMOTE DATASET RUN
+------------------
+NOT EXECUTED in this environment. The container has no direct dataset download
+capability. No FineWeb2 documents were downloaded and no claim of a real-corpus
+pretraining run is made here.
+
+LOCAL PIPELINE SMOKE TEST
+-------------------------
+Input: examples/data/tiny_text_demo.jsonl
+Documents retained: 30
+Model: causal Transformer, d_model=64, heads=4, layers=2, context=128
+Tokenizer vocabulary: 300
+Optimizer: AdamW
+Training rounds: 1
+Random windows: 10
+Tokens consumed: 1,280
+Initial validation loss: 5.9962887764
+Final validation loss: 5.3612203598
+Training loss: 5.7152959347
+Measured throughput: 1,233.1 tokens/s
+Host: Linux x86_64 (short smoke test only)
+
+Interpretation:
+- The model forward/backward, optimizer, checkpoint, tokenizer and metrics path
+  completed successfully on the tiny demonstration corpus.
+- Validation loss decreased in this run, but 10 steps and 30 documents do not
+  establish generalization. The generated text was still incoherent.
+- Throughput is not a stable long-run benchmark and must not be extrapolated to
+  Android, other architectures, larger contexts or larger models.
+
+NEXT REQUIRED EXPERIMENT
+------------------------
+Run examples/launch_first_pretrain.sh or the manual GitHub Actions workflow.
+Record the downloaded document count, characters, train/validation losses,
+tokens_seen, tokens/s, runtime, peak RAM and exact source revision.
+Only after this pilot is reproducible should model dimensions or corpus size
+be increased.
