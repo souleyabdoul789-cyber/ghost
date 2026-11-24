@@ -1,0 +1,623 @@
+name: ghost — 14-day CPU pretraining + agent SFT
+
+on:
+  push:
+    branches:
+      - training/ghost-0.7.0
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ghost-0.7.0-14day-training
+  cancel-in-progress: false
+
+jobs:
+  prepare_data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout training branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Restore a partial or completed corpus cache on retry
+        id: previous-data-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/fineweb2_fr_14day.jsonl
+            data/fineweb2_fr_14day.jsonl.source.json
+            runs/ghost-fr-14day/dataset
+            runs/ghost-fr-14day/tokens
+            runs/ghost-fr-14day/tokenizer.json
+            runs/ghost-fr-14day/run_config.json
+          key: ghost-fr-14day-v1-${{ github.sha }}-${{ github.run_attempt }}
+          restore-keys: |
+            ghost-fr-14day-v1-${{ github.sha }}-
+
+      - name: Install data dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install '.[data]'
+
+      - name: Compile and verify native C engine
+        run: |
+          python build_native.py
+          test -f python/ghost/libghost.so
+          python -c "from ghost import Tensor; t=Tensor([[1.0, 2.0]]); assert t.data == [1.0, 2.0]; t.free(); print('Ghost C engine OK')"
+
+      - name: Stream the larger French FineWeb2-HQ sample
+        run: |
+          python examples/fetch_hf_stream.py \
+            --dataset Brainquiver/general-web-fr-202608 \
+            --config fineweb2-hq-fra_Latn \
+            --revision 47d4541fa39938293ec294baccd91de876c32ac9 \
+            --output data/fineweb2_fr_14day.jsonl \
+            --max-documents 100000 \
+            --max-total-chars 200000000 \
+            --min-language-score 0.95 \
+            --min-quality-score 0.30 \
+            --resume
+
+      - name: Prepare corpus, tokenizer and token shards
+        run: |
+          python examples/train_ghost_long.py data/fineweb2_fr_14day.jsonl \
+            --output runs/ghost-fr-14day \
+            --vocab-size 4096 --min-frequency 2 \
+            --d-model 128 --heads 4 --layers 4 --context 512 \
+            --epochs 10000 --steps-per-epoch 20000 \
+            --checkpoint-every-steps 500 \
+            --learning-rate 2e-4 --weight-decay 0.05 \
+            --tokens-per-shard 1000000 --seed 42 \
+            --prepare-only
+
+      - name: Save prepared or partially downloaded corpus for retry
+        if: always() && steps.previous-data-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/fineweb2_fr_14day.jsonl
+            data/fineweb2_fr_14day.jsonl.source.json
+            runs/ghost-fr-14day/dataset
+            runs/ghost-fr-14day/tokens
+            runs/ghost-fr-14day/tokenizer.json
+            runs/ghost-fr-14day/run_config.json
+          key: ghost-fr-14day-v1-${{ github.sha }}-${{ github.run_attempt }}
+
+  segment_01:
+    needs: prepare_data
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '01'
+
+  segment_02:
+    needs: segment_01
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '02'
+
+  segment_03:
+    needs: segment_02
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '03'
+
+  segment_04:
+    needs: segment_03
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '04'
+
+  segment_05:
+    needs: segment_04
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '05'
+
+  segment_06:
+    needs: segment_05
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '06'
+
+  segment_07:
+    needs: segment_06
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '07'
+
+  segment_08:
+    needs: segment_07
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '08'
+
+  segment_09:
+    needs: segment_08
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '09'
+
+  segment_10:
+    needs: segment_09
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '10'
+
+  segment_11:
+    needs: segment_10
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '11'
+
+  segment_12:
+    needs: segment_11
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '12'
+
+  segment_13:
+    needs: segment_12
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '13'
+
+  segment_14:
+    needs: segment_13
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '14'
+
+  segment_15:
+    needs: segment_14
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '15'
+
+  segment_16:
+    needs: segment_15
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '16'
+
+  segment_17:
+    needs: segment_16
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '17'
+
+  segment_18:
+    needs: segment_17
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '18'
+
+  segment_19:
+    needs: segment_18
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '19'
+
+  segment_20:
+    needs: segment_19
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '20'
+
+  segment_21:
+    needs: segment_20
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '21'
+
+  segment_22:
+    needs: segment_21
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '22'
+
+  segment_23:
+    needs: segment_22
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '23'
+
+  segment_24:
+    needs: segment_23
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '24'
+
+  segment_25:
+    needs: segment_24
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '25'
+
+  segment_26:
+    needs: segment_25
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '26'
+
+  segment_27:
+    needs: segment_26
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '27'
+
+  segment_28:
+    needs: segment_27
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '28'
+
+  segment_29:
+    needs: segment_28
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '29'
+
+  segment_30:
+    needs: segment_29
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '30'
+
+  segment_31:
+    needs: segment_30
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '31'
+
+  segment_32:
+    needs: segment_31
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '32'
+
+  segment_33:
+    needs: segment_32
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '33'
+
+  segment_34:
+    needs: segment_33
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '34'
+
+  segment_35:
+    needs: segment_34
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '35'
+
+  segment_36:
+    needs: segment_35
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '36'
+
+  segment_37:
+    needs: segment_36
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '37'
+
+  segment_38:
+    needs: segment_37
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '38'
+
+  segment_39:
+    needs: segment_38
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '39'
+
+  segment_40:
+    needs: segment_39
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '40'
+
+  segment_41:
+    needs: segment_40
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '41'
+
+  segment_42:
+    needs: segment_41
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '42'
+
+  segment_43:
+    needs: segment_42
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '43'
+
+  segment_44:
+    needs: segment_43
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '44'
+
+  segment_45:
+    needs: segment_44
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '45'
+
+  segment_46:
+    needs: segment_45
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '46'
+
+  segment_47:
+    needs: segment_46
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '47'
+
+  segment_48:
+    needs: segment_47
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '48'
+
+  segment_49:
+    needs: segment_48
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '49'
+
+  segment_50:
+    needs: segment_49
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '50'
+
+  segment_51:
+    needs: segment_50
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '51'
+
+  segment_52:
+    needs: segment_51
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '52'
+
+  segment_53:
+    needs: segment_52
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '53'
+
+  segment_54:
+    needs: segment_53
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '54'
+
+  segment_55:
+    needs: segment_54
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '55'
+
+  segment_56:
+    needs: segment_55
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '56'
+
+  segment_57:
+    needs: segment_56
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '57'
+
+  segment_58:
+    needs: segment_57
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '58'
+
+  segment_59:
+    needs: segment_58
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '59'
+
+  segment_60:
+    needs: segment_59
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '60'
+
+  segment_61:
+    needs: segment_60
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '61'
+
+  segment_62:
+    needs: segment_61
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '62'
+  segment_63:
+    needs: segment_62
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '63'
+  segment_64:
+    needs: segment_63
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '64'
+  segment_65:
+    needs: segment_64
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '65'
+  segment_66:
+    needs: segment_65
+    uses: ./.github/workflows/ghost-training-segment.yml
+    with:
+      segment: '66'
+
+  agent_sft_and_smoke_tests:
+    needs: segment_66
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout training branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Restore corpus and tokenizer cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/fineweb2_fr_14day.jsonl
+            data/fineweb2_fr_14day.jsonl.source.json
+            runs/ghost-fr-14day/dataset
+            runs/ghost-fr-14day/tokens
+            runs/ghost-fr-14day/tokenizer.json
+            runs/ghost-fr-14day/run_config.json
+          key: ghost-fr-14day-v1-${{ github.sha }}-${{ github.run_attempt }}
+
+      - name: Download final pretrained checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: ghost-state
+          path: runs/ghost-fr-14day
+
+      - name: Install data and browser dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install '.[data,browser]'
+
+      - name: Compile and verify native C engine
+        run: |
+          python build_native.py
+          test -f python/ghost/libghost.so
+          python -c "from ghost import Tensor; t=Tensor([[1.0, 2.0]]); assert t.data == [1.0, 2.0]; t.free(); print('Ghost C engine OK')"
+
+      - name: Export final checkpoint as base model
+        run: python examples/export_ghost_checkpoint.py --run-dir runs/ghost-fr-14day
+
+      - name: Build examples for the actual ghost tool registry
+        run: python examples/build_ghost_agent_sft.py --output data/ghost-tool-sft.jsonl
+
+      - name: Fetch 500 human-style French instruction examples
+        run: |
+          python examples/fetch_french_instruct_sft.py \
+            --max-examples 500 --seed 42 \
+            --output data/french-instruct-sft.jsonl \
+            --manifest data/french-instruct-sft.source.json
+
+      - name: Merge and shuffle French instruction and tool examples
+        run: |
+          python examples/merge_ghost_sft_manifests.py \
+            --inputs data/ghost-tool-sft.jsonl data/french-instruct-sft.jsonl \
+            --output data/ghost-agent-sft-combined.jsonl --seed 42
+
+      - name: Supervised fine-tuning for French responses and ghost tool calls
+        run: |
+          python examples/train_ghost_sft.py data/ghost-agent-sft-combined.jsonl \
+            --base runs/ghost-fr-14day \
+            --output runs/ghost-agent-sft \
+            --epochs 5 --learning-rate 8e-5 --weight-decay 0.01 --seed 42
+
+      - name: Evaluate JSON action format and tool selection
+        continue-on-error: true
+        run: |
+          python examples/evaluate_ghost_agent.py \
+            --base-dir runs/ghost-fr-14day \
+            --sft-dir runs/ghost-agent-sft \
+            --output runs/ghost-agent-sft/evaluation.json
+
+      - name: Install browser and isolated-code runtime
+        continue-on-error: true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          python -m playwright install --with-deps chromium
+
+      - name: Browser agent smoke test on Python documentation only
+        continue-on-error: true
+        run: |
+          python examples/run_ghost_agent.py runs/ghost-agent-sft \
+            --model tool-model.json \
+            --tokenizer runs/ghost-fr-14day/tokenizer.json \
+            --allow-domain docs.python.org \
+            --browser --max-steps 4 --timeout 90 \
+            --task "Ouvre https://docs.python.org/3/library/pathlib.html et résume le sujet de la page." \
+            > runs/ghost-agent-sft/browser-smoke-test.json 2>&1
+
+      - name: Isolated Python sandbox agent smoke test
+        continue-on-error: true
+        run: |
+          python examples/run_ghost_agent.py runs/ghost-agent-sft \
+            --model tool-model.json \
+            --tokenizer runs/ghost-fr-14day/tokenizer.json \
+            --allow-domain docs.python.org \
+            --enable-code --max-steps 4 --timeout 60 \
+            --task "Exécute print(2 + 2) dans le bac à sable Python et rapporte le résultat." \
+            > runs/ghost-agent-sft/python-sandbox-smoke-test.json 2>&1
+
+      - name: Enforce actual browser and sandbox agent acceptance
+        if: always()
+        run: |
+          python examples/verify_ghost_agent_smoke.py \
+            --evaluation runs/ghost-agent-sft/evaluation.json \
+            --browser-report runs/ghost-agent-sft/browser-smoke-test.json \
+            --sandbox-report runs/ghost-agent-sft/python-sandbox-smoke-test.json \
+            --output runs/ghost-agent-sft/agent-acceptance.json \
+            --minimum-tool-accuracy 0.50 \
+            --minimum-valid-action-rate 0.75
+
+      - name: Upload final model, SFT and evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghost-0.7.0-final-agent-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 90
+          path: |
+            runs/ghost-fr-14day/model.json
+            runs/ghost-fr-14day/tokenizer.json
+            runs/ghost-fr-14day/checkpoint.json
+            runs/ghost-fr-14day/metrics.jsonl
+            runs/ghost-fr-14day/run_status.json
+            runs/ghost-fr-14day/report.txt
+            runs/ghost-agent-sft/tool-model.json
+            runs/ghost-agent-sft/checkpoint.json
+            runs/ghost-agent-sft/evaluation.json
+            runs/ghost-agent-sft/browser-smoke-test.json
+            runs/ghost-agent-sft/python-sandbox-smoke-test.json
+            runs/ghost-agent-sft/agent-acceptance.json
+            data/french-instruct-sft.source.json
+            data/ghost-agent-sft-combined.jsonl
+

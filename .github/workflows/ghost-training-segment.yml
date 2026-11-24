@@ -1,0 +1,130 @@
+name: ghost — training segment
+
+on:
+  workflow_call:
+    inputs:
+      segment:
+        description: Sequential training segment number
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout training branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Restore immutable corpus and token-shard cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/fineweb2_fr_14day.jsonl
+            data/fineweb2_fr_14day.jsonl.source.json
+            runs/ghost-fr-14day/dataset
+            runs/ghost-fr-14day/tokens
+            runs/ghost-fr-14day/tokenizer.json
+            runs/ghost-fr-14day/run_config.json
+          key: ghost-fr-14day-v1-${{ github.sha }}-${{ github.run_attempt }}
+
+      - name: Install data dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install '.[data]'
+
+      - name: Compile and verify native C engine
+        run: |
+          python build_native.py
+          test -f python/ghost/libghost.so
+          python -c "from ghost import Tensor; t=Tensor([[1.0, 2.0]]); assert t.data == [1.0, 2.0]; t.free(); print('Ghost C engine OK')"
+
+      - name: Restore previous segment checkpoint
+        if: inputs.segment != '01'
+        uses: actions/download-artifact@v4
+        with:
+          name: ghost-state
+          path: runs/ghost-fr-14day
+
+      - name: Stream larger French FineWeb2-HQ sample once
+        if: ${{ !hashFiles('data/fineweb2_fr_14day.jsonl') }}
+        run: |
+          python examples/fetch_hf_stream.py \
+            --dataset Brainquiver/general-web-fr-202608 \
+            --config fineweb2-hq-fra_Latn \
+            --revision 47d4541fa39938293ec294baccd91de876c32ac9 \
+            --output data/fineweb2_fr_14day.jsonl \
+            --max-documents 100000 \
+            --max-total-chars 200000000 \
+            --min-language-score 0.95 \
+            --min-quality-score 0.30 \
+            --resume
+
+      - name: Train current segment and save a resumable checkpoint
+        run: |
+          python examples/train_ghost_long.py data/fineweb2_fr_14day.jsonl \
+            --output runs/ghost-fr-14day \
+            --vocab-size 4096 --min-frequency 2 \
+            --d-model 128 --heads 4 --layers 4 --context 512 \
+            --epochs 10000 --steps-per-epoch 20000 \
+            --checkpoint-every-steps 500 \
+            --learning-rate 2e-4 --weight-decay 0.05 \
+            --tokens-per-shard 1000000 --seed 42 \
+            --max-seconds 18000 --resume
+
+      - name: Export latest model weights from checkpoint
+        if: always()
+        run: |
+          if [ -f runs/ghost-fr-14day/checkpoint.json ]; then
+            python examples/export_ghost_checkpoint.py --run-dir runs/ghost-fr-14day
+          fi
+
+      - name: Write training report
+        if: always()
+        run: |
+          if [ -d runs/ghost-fr-14day ] && [ -f runs/ghost-fr-14day/run_config.json ]; then
+            python examples/write_ghost_long_report.py \
+              --run-dir runs/ghost-fr-14day \
+              --source-manifest data/fineweb2_fr_14day.jsonl.source.json \
+              --output runs/ghost-fr-14day/report.txt || true
+          fi
+
+      - name: Save corpus and tokenization cache for following segments
+        if: always() && steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/fineweb2_fr_14day.jsonl
+            data/fineweb2_fr_14day.jsonl.source.json
+            runs/ghost-fr-14day/dataset
+            runs/ghost-fr-14day/tokens
+            runs/ghost-fr-14day/tokenizer.json
+            runs/ghost-fr-14day/run_config.json
+          key: ghost-fr-14day-v1-${{ github.sha }}-${{ github.run_attempt }}
+
+      - name: Replace the single rolling checkpoint artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghost-state
+          overwrite: true
+          if-no-files-found: warn
+          retention-days: 1
+          path: |
+            runs/ghost-fr-14day/model.json
+            runs/ghost-fr-14day/checkpoint.json
+            runs/ghost-fr-14day/metrics.jsonl
+            runs/ghost-fr-14day/generation_sample.txt
+            runs/ghost-fr-14day/run_status.json
+            runs/ghost-fr-14day/run_config.json
+            runs/ghost-fr-14day/report.txt
