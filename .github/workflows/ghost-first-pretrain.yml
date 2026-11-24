@@ -1,3 +1,4 @@
+
 name: ghost — first French pretraining
 
 on:
@@ -49,9 +50,9 @@ concurrency:
 
 jobs:
   pretrain:
-    # GitHub-hosted jobs have a hard six-hour execution limit.
     runs-on: ubuntu-latest
     timeout-minutes: 360
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,6 +78,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install '.[data]'
+
+      - name: Compile ghost native C engine
+        run: |
+          python build_native.py
+          test -f python/ghost/libghost.so
+          python -c "from ghost import Tensor; t=Tensor([[1.0, 2.0]]); assert t.data == [1.0, 2.0]; t.free(); print('Moteur natif OK')"
 
       - name: Stream a bounded, revision-pinned French corpus
         run: |
@@ -140,3 +147,4 @@ jobs:
             runs/ghost-fr-pilot-001/report.txt
             runs/ghost-fr-pilot-001/dataset/manifest.jsonl
             data/fineweb2_fr_pilot.jsonl.source.json
+
